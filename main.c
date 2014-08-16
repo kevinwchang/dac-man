@@ -1,5 +1,7 @@
 #include <xc.h>
 #include <stdint.h>
+#include "waveforms.h"
+#include "effects.h"
 
 #define _XTAL_FREQ 48000000
 
@@ -7,39 +9,15 @@
 #define LED_YELLOW(v) { TRISB6 = !(v); }
 #define LED_RED(v) { TRISC6 = !(v); }
 
-uint8_t const sin[218] = {16,16,16,17,17,18,18,19,
-19,19,20,20,21,21,22,22,
-22,23,23,24,24,24,25,25,
-25,26,26,26,27,27,27,28,
-28,28,28,29,29,29,29,29,
-30,30,30,30,30,30,31,31,
-31,31,31,31,31,31,31,31,
-31,31,31,31,31,31,31,31,
-30,30,30,30,30,30,29,29,
-29,29,29,28,28,28,28,27,
-27,27,26,26,26,25,25,25,
-24,24,24,23,23,22,22,22,
-21,21,20,20,19,19,19,18,
-18,17,17,16,16,16,15,15,
-14,14,13,13,12,12,12,11,
-11,10,10,9,9,9,8,8,
-7,7,7,6,6,6,5,5,
-5,4,4,4,3,3,3,3,
-2,2,2,2,2,1,1,1,
-1,1,1,0,0,0,0,0,
-0,0,0,0,0,0,0,0,
-0,0,0,0,0,1,1,1,
-1,1,1,2,2,2,2,2,
-3,3,3,3,4,4,4,5,
-5,5,6,6,6,7,7,7,
-8,8,9,9,9,10,10,11,
-11,12,12,12,13,13,14,14,
-15,15};
+#define TICKS_PER_REG_UPDATE 1600
 
-uint8_t count = 0;
+uint16_t volatile ticks = 0;
+
+uint16_t volatile freq2 = 0;
+uint8_t volatile wave2 = 0, vol2 = 0;
 
 void main()
-{
+{    
     // Set up the LEDs
     LATB7 = 1;
     LATB6 = 1;
@@ -60,19 +38,89 @@ void main()
     RCONbits.IPEN = 1;    // Enable interrupt priority levels
     INTCONbits.GIE = 1;   // Enable high priority interrupts
 
-    while(1) {}
-}
+    uint8_t const * e = all_sounds[0];
 
+    static bit init = 0, dir_reverse = 0;
+    uint8_t base_freq, freq, duration, repeat, vol;
+    int8_t freq_inc;
+
+    uint8_t wait = 0, sixtieths = 0, index = 0;
+
+    while (1)
+    {
+        if (ticks >= TICKS_PER_REG_UPDATE)
+        {
+            ticks = 0;
+            sixtieths++;
+
+            if (wait)
+            {
+                wait--;
+                continue;
+            }
+
+            if (!init)
+            {
+                init = 1;
+                dir_reverse = 0;
+                freq = base_freq = e[1];
+                freq_inc = e[2];
+                duration = e[3] & 0x7f;
+                repeat = e[5];
+                vol = e[6] & 0xf;
+
+                sixtieths = 0;
+            }
+
+            if (--duration == 0 ||  sixtieths > 240)
+            {
+                if (repeat-- <= 1  ||  sixtieths > 240)
+                {
+                    // done with this effect
+                    init = 0;
+                    vol2 = 0;
+                    index++;
+                    if (index >= 13)
+                        index = 0;
+                    e = all_sounds[index];
+                    continue;
+                }
+
+                duration = e[3] & 0x7f;
+
+                if (e[3] & 0x80)
+                {
+                    // reverse
+                    freq_inc = -freq_inc;
+                    dir_reverse = ~dir_reverse;
+                }
+
+                if (!dir_reverse)
+                {
+                    base_freq += e[4];
+                    freq = base_freq;
+                    vol -= e[7];
+                }
+            }
+
+            freq += freq_inc;
+            freq2 = (uint16_t)freq << ((e[0] & 0x70) >> 4);
+            wave2 = e[0] & 0x7;
+            vol2 = vol;
+        }
+    }
+}
+ uint16_t volatile acc2 = 0;
 void interrupt highIsr()
 {
+    //LED_RED(1);
+
     PIR1bits.TMR2IF = 0;
-    LED_RED(1);
+    ticks++;
 
-    count++;
-    if (count > 217)
-        count = 0;
-
-    VREFCON2 = sin[count];
-
-    LED_RED(0);
+    acc2 += freq2;
+    VREFCON2 = vol2 ? waveforms[wave2][*((uint8_t *)&acc2 + 1) >> 3] : 7;
+    //VREFCON2 = ((uint16_t)waveforms[wave2][*((uint8_t *)&acc2 + 1) >> 3] * vol2 * 31 + 112) / 225;
+    
+    //LED_RED(0);
 }
