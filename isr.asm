@@ -29,12 +29,12 @@ highIsr:
     ; clear Timer2-to-PR2-match interrupt flag
     bcf     PIR1, PIR1_TMR2IF_POSN, c
 
-    ; select bank 1 (assumption: all variables are in the same bank)
+    ; select bank 0 (assumption: all variables are in the same bank)
     movlb   0 ;
 
     ; save context
-    movff    FSR0H, BANKMASK(fsr0h_temp)
-    movff    FSR0L, BANKMASK(fsr0l_temp)
+    movff    FSR0H, fsr0h_temp
+    movff    FSR0L, fsr0l_temp
 
     ; ticks++
     infsnz  BANKMASK(_ticks), f, b
@@ -98,8 +98,8 @@ highIsrDone:
     bcf     TRISC, 6, c
 
     ; restore context
-    movff   BANKMASK(fsr0h_temp), FSR0H
-    movff   BANKMASK(fsr0l_temp), FSR0L
+    movff   fsr0h_temp, FSR0H
+    movff   fsr0l_temp, FSR0L
 
     retfie  f
 
