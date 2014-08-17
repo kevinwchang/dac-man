@@ -13,20 +13,78 @@
 
 uint16_t volatile bank0 ticks = TICKS_PER_REG_UPDATE;
 
-// channel 1 registers
-uint32_t bank0 rfreq1;
-uint8_t  bank0 rwave1;
-uint8_t  bank0 rvol1;
+// channel registers
+uint32_t bank0 rfreq[3]; // channel 1: 20 bits; channels 2 & 3: 16 bits
+uint8_t  bank0 rwave[3];
+uint8_t  bank0 rvol[3];
 
-// channel 2 registers
-uint16_t bank0 rfreq2;
-uint8_t  bank0 rwave2;
-uint8_t  bank0 rvol2;
+static uint8_t const * effect[3];
+static uint8_t effect_trigger[3];
+static uint8_t effect_is_playing[3];
 
-// channel 2 registers
-uint16_t bank0 rfreq3;
-uint8_t  bank0 rwave3;
-uint8_t  bank0 rvol3;
+// assumptions:
+//  c is 0-2
+//  effect[c] points to a valid effect
+void update_effect(uint8_t c)
+{
+    static uint8_t dir_reverse[3];
+    static uint8_t base_freq[3], freq[3], duration[3], repeat[3], vol[3];
+    static int8_t freq_inc[3];
+
+    if (effect_trigger[c])
+    {
+        effect_trigger[c] = 0;
+        effect_is_playing[c] = 1;
+        dir_reverse[c] = 0;
+        freq[c] = base_freq[c] = effect[c][1];
+        freq_inc[c] = effect[c][2];
+        duration[c] = effect[c][3] & 0x7f;
+        repeat[c] = effect[c][5];
+        vol[c] = effect[c][6] & 0xf;
+    }
+    else if (!effect_is_playing[c])
+        return;
+
+    if (--duration[c] == 0)
+    {
+        // done with duration counter; check repeat counter
+        if (repeat[c]-- <= 1)
+        {
+            // done with this effect
+            effect_is_playing[c] = 0;
+            rvol[c] = 0;
+            return;
+        }
+        else
+        {
+            // reset duration counter
+            duration[c] = effect[c][3] & 0x7f;
+
+            if (effect[c][3] & 0x80)
+            {
+                // reverse
+                freq_inc[c] = -freq_inc[c];
+                dir_reverse[c] = ~dir_reverse[c];
+            }
+
+            if (!dir_reverse[c])
+            {
+                // not reversing, so apply increments
+                base_freq[c] += effect[c][4];
+                freq[c] = base_freq[c];
+                vol[c] += effect[c][7];
+            }
+        }
+    }
+
+    freq[c] += freq_inc[c];
+    uint8_t shift = (effect[c][0] & 0x70) >> 4;
+
+    // set registers
+    rfreq[c] = (uint32_t)freq[c] << shift;
+    rwave[c] = effect[c][0] & 0x7;
+    rvol[c] = vol[c];
+}
 
 void main()
 {    
@@ -51,114 +109,58 @@ void main()
     RCONbits.IPEN = 1;    // Enable interrupt priority levels
     INTCONbits.GIE = 1;   // Enable high priority interrupts
 
-    uint8_t const * e[3];
-    e[0] = &insert_coin;
-    e[1] = back_sounds[0];
-    e[2] = other_sounds[0];
+    effect[0] = &insert_coin;
+    effect[1] = back_sounds[0];
+    effect[2] = other_sounds[0];
 
-    uint8_t init[3], dir_reverse[3];
-    uint8_t base_freq[3], freq[3], duration[3], repeat[3], vol[3];
-    int8_t freq_inc[3];
-
-    uint8_t wait[3] = { 0 }, sixtieths[3], index[3];
+    uint8_t wait_after[3], timeout[3], index[3];
 
     while (1)
-    {
-        
+    {  
         if (ticks >= TICKS_PER_REG_UPDATE)
         {
             ticks = 0;
 
             for (uint8_t c = 0; c < 3; c++)
             {
-                if (!e[c])
-                    continue;
-
-
-                sixtieths[c]++;
-
-                if (wait[c])
+                if (effect_is_playing[c] && timeout[c])
+                    timeout[c]--;
+                else
                 {
-                    wait[c]--;
-                    continue;
-                }
-
-                if (!init[c])
-                {
-                    init[c] = 1;
-                    dir_reverse[c] = 0;
-                    freq[c] = base_freq[c] = e[c][1];
-                    freq_inc[c] = e[c][2];
-                    duration[c] = e[c][3] & 0x7f;
-                    repeat[c] = e[c][5];
-                    vol[c] = e[c][6] & 0xf;
-
-                    sixtieths[c] = 0;
-                }
-
-                if (--duration[c] == 0 ||  sixtieths[c] > 240)
-                {
-                    // finished with duration counter; check repeat counter
-                    if (repeat[c]-- <= 1  ||  sixtieths[c] > 240)
+                    if (wait_after[c])
                     {
-                        // done with this effect
-                        init[c] = 0;
-                        vol[c] = 0;
+                        wait_after[c]--;
+                        continue;
+                    }
+                    else
+                    {
                         index[c]++;
 
                         switch (c)
                         {
                             case 0:
-                                wait[c] = 60;
+                                effect[c] = &insert_coin;
+                                wait_after[c] = 60;
                                 break;
 
                             case 1:
-                                if (index[1] >= 7)
-                                    index[1] = 0;
-                                e[1] = back_sounds[index[1]];
+                                if (index[c] >= 7)
+                                    index[c] = 0;
+                                effect[c] = back_sounds[index[c]];
                                 break;
-                                
-                            default: // 2
-                                if (index[2] >= 6)
-                                    index[2] = 0;
-                                e[2] = other_sounds[index[2]];
+
+                            case 2: // 2
+                                if (index[c] >= 6)
+                                    index[c] = 0;
+                                effect[c] = other_sounds[index[c]];
                                 break;
                         }
-                    }
-                    else
-                    {
-                        // reset duration counter
-                        duration[c] = e[c][3] & 0x7f;
-
-                        if (e[c][3] & 0x80)
-                        {
-                            // reverse
-                            freq_inc[c] = -freq_inc[c];
-                            dir_reverse[c] = ~dir_reverse[c];
-                        }
-
-                        if (!dir_reverse[c])
-                        {
-                            // not reversing, so apply increments
-                            base_freq[c] += e[c][4];
-                            freq[c] = base_freq[c];
-                            vol[c] += e[c][7];
-                        }
+                        timeout[c] = 240;
+                        effect_trigger[c] = 1;
                     }
                 }
-
-                freq[c] += freq_inc[c];
+                update_effect(c);
             }
-            
-            rfreq1 = (uint32_t)freq[0] << ((e[0][0] & 0x70) >> 4);
-            rwave1 = e[0][0] & 0x7;
-            rvol1 = vol[0];
-            rfreq2 = (uint16_t)freq[1] << ((e[1][0] & 0x70) >> 4);
-            rwave2 = e[1][0] & 0x7;
-            rvol2 = vol[1];
-            rfreq3 = (uint16_t)freq[2] << ((e[2][0] & 0x70) >> 4);
-            rwave3 = e[2][0] & 0x7;
-            rvol3 = vol[2];
         }
     }
 }
