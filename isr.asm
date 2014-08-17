@@ -70,8 +70,17 @@ highIsr:
     clrf    BANKMASK(chan), b       ; chan >= 3; reset to 0 and continue to channel1
 
 channel1:
-    movlw   15
-    movwf   VREFCON2, c
+    swapf   BANKMASK(acc1)+2, w, b  ; W = acc1u[3:0] << 4 | acc1u[7:4] >> 4
+    andlw   0xf0                    ; W = acc1u[3:0] << 4
+    btfsc   BANKMASK(acc1)+1, 7, b
+    bsf     WREG, 3, c              ; W = acc1u[3:0] << 4 | acc1h[7] >> 4
+    iorwf   BANKMASK(_rwave1), w, b ; W = (acc1u[3:0] << 4 | acc1h[7] >> 4) | rwave1    (assumption: rwave1 is 3 bits)
+    movwf   FSR0L, c
+    swapf   INDF0, w, c             ; W = waveform_sample << 4                  (assumption: waveform samples are 4 bits)
+    iorwf   BANKMASK(_rvol1), w, b  ; W = (waveform_sample << 4) | rvol2        (assumption: rvol1 is 4 bits)
+    lfsr    0, 0x300                ; point FSR0 at volume modification table
+    movwf   FSR0L, c
+    movff   INDF0, VREFCON2         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
     bra     highIsrDone
 
 channel2:

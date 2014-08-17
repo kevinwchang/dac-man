@@ -71,6 +71,10 @@ void main()
 
             for (uint8_t c = 0; c < 3; c++)
             {
+                if (!e[c])
+                    continue;
+
+
                 sixtieths[c]++;
 
                 if (wait[c])
@@ -94,6 +98,7 @@ void main()
 
                 if (--duration[c] == 0 ||  sixtieths[c] > 240)
                 {
+                    // finished with duration counter; check repeat counter
                     if (repeat[c]-- <= 1  ||  sixtieths[c] > 240)
                     {
                         // done with this effect
@@ -122,6 +127,7 @@ void main()
                     }
                     else
                     {
+                        // reset duration counter
                         duration[c] = e[c][3] & 0x7f;
 
                         if (e[c][3] & 0x80)
@@ -133,6 +139,7 @@ void main()
 
                         if (!dir_reverse[c])
                         {
+                            // not reversing, so apply increments
                             base_freq[c] += e[c][4];
                             freq[c] = base_freq[c];
                             vol[c] += e[c][7];
@@ -142,6 +149,7 @@ void main()
 
                 freq[c] += freq_inc[c];
             }
+            
             rfreq1 = (uint32_t)freq[0] << ((e[0][0] & 0x70) >> 4);
             rwave1 = e[0][0] & 0x7;
             rvol1 = vol[0];
@@ -154,40 +162,3 @@ void main()
         }
     }
 }
-
-/*void interrupt highIsr()
-{
-    //static uint32_t acc1 = 0;
-    static uint16_t acc2 = 0;
-    static uint16_t acc3 = 0;
-    static uint8_t channel = 1;
-    
-    LED_RED(0);
-
-    PIR1bits.TMR2IF = 0;
-    ticks++;
-
-    //acc1 += rfreq1;
-    acc2 += rfreq2;
-    acc3 += rfreq3;
-
-    if (++channel >= 3)
-        channel = 0;
-
-    switch (channel)
-    {
-        case 0:
-            VREFCON2 = 15;//vol_products[waveforms[rwave1][(*((uint8_t *)&acc1 + 2) & 0xF) << 1 | (*((uint8_t *)&acc1 + 2) & 0x80 ? 1 : 0)]][rvol1];
-            break;
-
-        case 1:
-            VREFCON2 = vol_modify[waveform[*((uint8_t *)&acc2 + 1) & 0xf8 | rwave2]][rvol2];
-            break;
-
-        default: // 2
-            VREFCON2 = vol_modify[waveform[*((uint8_t *)&acc3 + 1) & 0xf8 | rwave3]][rvol3];
-            break;
-    }
-        
-    LED_RED(1);
-}*/
