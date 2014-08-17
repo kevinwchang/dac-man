@@ -6,6 +6,7 @@
                    projectFiles="true">
       <itemPath>effects.h</itemPath>
       <itemPath>waveforms.h</itemPath>
+      <itemPath>songs.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
