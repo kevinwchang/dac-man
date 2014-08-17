@@ -19,9 +19,5 @@ uint8_t const siren5[8]      = { 0x36, 0x48, 0x08, 0x88, 0x00, 0x00, 0x06, 0x00 
 uint8_t const blue_ghosts[8] = { 0x24, 0x00, 0x06, 0x08, 0x00, 0x00, 0x0a, 0x00 };
 uint8_t const ghost_eyes[8]  = { 0x40, 0x70, 0xfa, 0x10, 0x00, 0x00, 0x0a, 0x00 };
 
-uint8_t const * const back_sounds[7] = { &blue_ghosts, &ghost_eyes, &siren1, &siren2, &siren3, &siren4, &siren5 };
-uint8_t const * const other_sounds[6] = { &eat_dot1, &eat_dot2, &eat_fruit, &eat_ghost, &death1, &death2 };
-
-
 #endif	/* EFFECTS_H */
 

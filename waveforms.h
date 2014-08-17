@@ -1,6 +1,8 @@
 #ifndef WAVEFORMS_H
 #define	WAVEFORMS_H
 
+#include <stdint.h>
+
 // upper 5 bits are offset (rows), lower 3 bits are waveform select (cols)
 uint8_t bank2 waveform[256] = {
     0x07, 0x07, 0x07, 0x07, 0x00, 0x07, 0x00, 0x00,
