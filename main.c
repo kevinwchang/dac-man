@@ -11,10 +11,22 @@
 
 #define TICKS_PER_REG_UPDATE 1600
 
-uint16_t volatile ticks = 0;
+uint16_t volatile bank0 ticks = TICKS_PER_REG_UPDATE;
 
-uint16_t volatile r_freq[3];
-uint8_t volatile r_wave[3], r_vol[3];
+// channel 1 registers
+uint32_t bank0 rfreq1;
+uint8_t  bank0 rwave1;
+uint8_t  bank0 rvol1;
+
+// channel 2 registers
+uint16_t bank0 rfreq2;
+uint8_t  bank0 rwave2;
+uint8_t  bank0 rvol2;
+
+// channel 2 registers
+uint16_t bank0 rfreq3;
+uint8_t  bank0 rwave3;
+uint8_t  bank0 rvol3;
 
 void main()
 {    
@@ -40,6 +52,7 @@ void main()
     INTCONbits.GIE = 1;   // Enable high priority interrupts
 
     uint8_t const * e[3];
+    e[0] = &insert_coin;
     e[1] = back_sounds[0];
     e[2] = other_sounds[0];
 
@@ -47,10 +60,11 @@ void main()
     uint8_t base_freq[3], freq[3], duration[3], repeat[3], vol[3];
     int8_t freq_inc[3];
 
-    uint8_t wait[3], sixtieths[3], index[3];
+    uint8_t wait[3] = { 0 }, sixtieths[3], index[3];
 
     while (1)
     {
+        
         if (ticks >= TICKS_PER_REG_UPDATE)
         {
             ticks = 0;
@@ -84,12 +98,13 @@ void main()
                     {
                         // done with this effect
                         init[c] = 0;
-                        r_vol[c] = 0;
+                        vol[c] = 0;
                         index[c]++;
 
                         switch (c)
                         {
                             case 0:
+                                wait[c] = 60;
                                 break;
 
                             case 1:
@@ -104,37 +119,45 @@ void main()
                                 e[2] = other_sounds[index[2]];
                                 break;
                         }
-                        continue;
                     }
-
-                    duration[c] = e[c][3] & 0x7f;
-
-                    if (e[c][3] & 0x80)
+                    else
                     {
-                        // reverse
-                        freq_inc[c] = -freq_inc[c];
-                        dir_reverse[c] = ~dir_reverse[c];
-                    }
+                        duration[c] = e[c][3] & 0x7f;
 
-                    if (!dir_reverse[c])
-                    {
-                        base_freq[c] += e[c][4];
-                        freq[c] = base_freq[c];
-                        vol[c] += e[c][7];
+                        if (e[c][3] & 0x80)
+                        {
+                            // reverse
+                            freq_inc[c] = -freq_inc[c];
+                            dir_reverse[c] = ~dir_reverse[c];
+                        }
+
+                        if (!dir_reverse[c])
+                        {
+                            base_freq[c] += e[c][4];
+                            freq[c] = base_freq[c];
+                            vol[c] += e[c][7];
+                        }
                     }
                 }
 
                 freq[c] += freq_inc[c];
-                r_freq[c] = (uint16_t)freq[c] << ((e[c][0] & 0x70) >> 4);
-                r_wave[c] = e[c][0] & 0x7;
-                r_vol[c] = vol[c];
             }
+            rfreq1 = (uint32_t)freq[0] << ((e[0][0] & 0x70) >> 4);
+            rwave1 = e[0][0] & 0x7;
+            rvol1 = vol[0];
+            rfreq2 = (uint16_t)freq[1] << ((e[1][0] & 0x70) >> 4);
+            rwave2 = e[1][0] & 0x7;
+            rvol2 = vol[1];
+            rfreq3 = (uint16_t)freq[2] << ((e[2][0] & 0x70) >> 4);
+            rwave3 = e[2][0] & 0x7;
+            rvol3 = vol[2];
         }
     }
 }
 
-void interrupt highIsr()
+/*void interrupt highIsr()
 {
+    //static uint32_t acc1 = 0;
     static uint16_t acc2 = 0;
     static uint16_t acc3 = 0;
     static uint8_t channel = 1;
@@ -144,8 +167,9 @@ void interrupt highIsr()
     PIR1bits.TMR2IF = 0;
     ticks++;
 
-    acc2 += r_freq[1];
-    acc3 += r_freq[2];
+    //acc1 += rfreq1;
+    acc2 += rfreq2;
+    acc3 += rfreq3;
 
     if (++channel >= 3)
         channel = 0;
@@ -153,17 +177,17 @@ void interrupt highIsr()
     switch (channel)
     {
         case 0:
-            VREFCON2 = 15;
+            VREFCON2 = 15;//vol_products[waveforms[rwave1][(*((uint8_t *)&acc1 + 2) & 0xF) << 1 | (*((uint8_t *)&acc1 + 2) & 0x80 ? 1 : 0)]][rvol1];
             break;
 
         case 1:
-            VREFCON2 =  vol_product[waveforms[r_wave[1]][*((uint8_t *)&acc2 + 1) >> 3]][r_vol[1]];
+            VREFCON2 = vol_modify[waveform[*((uint8_t *)&acc2 + 1) & 0xf8 | rwave2]][rvol2];
             break;
 
         default: // 2
-            VREFCON2 = vol_product[waveforms[r_wave[2]][*((uint8_t *)&acc3 + 1) >> 3]][r_vol[2]];
+            VREFCON2 = vol_modify[waveform[*((uint8_t *)&acc3 + 1) & 0xf8 | rwave3]][rvol3];
             break;
     }
         
     LED_RED(1);
-}
+}*/
