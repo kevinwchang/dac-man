@@ -62,8 +62,6 @@ highIsr:
 
     lfsr    0, 0x200 ; point FSR0 at waveform table
 
-bra     channel2
-
     incf    BANKMASK(chan), f, b    ; channel++
     dcfsnz  BANKMASK(chan), w, b    ; if (chan == 1)
     bra     channel2                ;   goto channel2
@@ -89,8 +87,15 @@ channel2:
     bra     highIsrDone
 
 channel3:
-    movlw   15
-    movwf   VREFCON2, c
+    movf    BANKMASK(acc3)+1, w, b  ; W = acc3h
+    andlw   0xf8                    ; W = acc3h & 0xf8
+    iorwf   BANKMASK(_rwave3), w, b ; W = (acc3h & 0xf8) | rwave2               (assumption: rwave3 is 3 bits)
+    movwf   FSR0L, c
+    swapf   INDF0, w, c             ; W = waveform_sample << 4                  (assumption: waveform samples are 4 bits)
+    iorwf   BANKMASK(_rvol3), w, b  ; W = (waveform_sample << 4) | rvol3        (assumption: rvol3 is 4 bits)
+    lfsr    0, 0x300                ; point FSR0 at volume modification table
+    movwf   FSR0L, c
+    movff   INDF0, VREFCON2         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
     bra     highIsrDone
 
 highIsrDone:
