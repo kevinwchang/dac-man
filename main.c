@@ -17,6 +17,93 @@ uint16_t volatile bank0 ticks = TICKS_PER_SOUND_UPDATE;
 uint8_t const * const back_effects[7] = { &siren1, &siren2, &siren3, &siren4, &siren5, &blue_ghosts, &ghost_eyes };
 uint8_t const * const event_effects[6] = { &eat_dot1, &eat_dot2, &eat_fruit, &eat_ghost, &death1, &death2 };
 
+
+void select_sounds_loop()
+{
+    static uint8_t state, started, e2, e3, timeout;
+
+    switch (state)
+    {
+        case 0:
+            if (!started)
+            {
+                started = 1;
+                play_song(1, &introc1);
+                play_song(2, &introc2);
+            }
+            else if (!song_is_playing(1))
+            {
+                state++;
+                started = 0;
+            }
+            break;
+
+        case 2:
+            if (!started)
+            {
+                started = 1;
+                play_song(1, &intermissionc1);
+                play_song(2, &intermissionc2);
+            }
+            else if (!song_is_playing(1))
+            {
+                state++;
+                started = 0;
+            }
+            break;
+
+        case 4:
+            if (!started)
+            {
+                started = 1;
+                e2 = e3 = 0;
+                timeout = 180;
+                play_effect(2, back_effects[e2++]);
+                play_effect(3, event_effects[e3++]);
+            }
+            else
+            {
+                if (!effect_is_playing(3))
+                {
+                    if (e3 == 6)
+                        e3 = 0;
+                    play_effect(3, event_effects[e3++]);
+                }
+                if (!--timeout)
+                {
+                    if (e2 == 7)
+                    {
+                        stop_effect(2);
+                        stop_effect(3);
+                        state++;
+                        started = 0;
+                    }
+                    else
+                    {
+                        timeout = 180;
+                        play_effect(2, back_effects[e2++]);
+                    }
+                }
+            }
+            break;
+
+        default:
+            if (!started)
+            {
+                started = 1;
+                timeout = 60;
+            }
+            else if (!--timeout)
+            {
+                state++;
+                if (state == 6)
+                    state = 0;
+                started = 0;
+            }
+    }
+}
+
+
 void main()
 {    
     // Set up the LEDs
@@ -40,94 +127,13 @@ void main()
     RCONbits.IPEN = 1;    // Enable interrupt priority levels
     INTCONbits.GIE = 1;   // Enable high priority interrupts
 
-    uint8_t state, started, e2, e3, timeout;
-
     while (1)
     {  
         if (ticks >= TICKS_PER_SOUND_UPDATE)
         {
             ticks = 0;
             
-            switch (state)
-            {
-                case 0:
-                    if (!started)
-                    {
-                        started = 1;
-                        play_song(1, &introc1);
-                        play_song(2, &introc2);
-                    }
-                    else if (!song_is_playing(1))
-                    {
-                        state++;
-                        started = 0;
-                    }
-                    break;
-
-                case 2:
-                    if (!started)
-                    {
-                        started = 1;
-                        play_song(1, &intermissionc1);
-                        play_song(2, &intermissionc2);
-                    }
-                    else if (!song_is_playing(1))
-                    {
-                        state++;
-                        started = 0;
-                    }
-                    break;
-
-                case 4:
-                    if (!started)
-                    {
-                        started = 1;
-                        e2 = e3 = 0;
-                        timeout = 180;
-                        play_effect(2, back_effects[e2++]);
-                        play_effect(3, event_effects[e3++]);
-                    }
-                    else
-                    {
-                        if (!effect_is_playing(3))
-                        {
-                            if (e3 == 6)
-                                e3 = 0;
-                            play_effect(3, event_effects[e3++]);
-                        }
-                        if (!--timeout)
-                        {
-                            if (e2 == 7)
-                            {
-                                stop_effect(2);
-                                stop_effect(3);
-                                state++;
-                                started = 0;
-                            }
-                            else
-                            {
-                                timeout = 180;
-                                play_effect(2, back_effects[e2++]);
-                            }
-                        }
-                    }
-                    break;
-
-                default:
-                    if (!started)
-                    {
-                        started = 1;
-                        timeout = 60;
-                    }
-                    else if (!--timeout)
-                    {
-                        state++;
-                        if (state == 6)
-                            state = 0;
-                        started = 0;
-                    }
-            }
-
+            select_sounds_loop();
             update_sounds();
         }
     }
