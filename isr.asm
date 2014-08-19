@@ -99,7 +99,7 @@ channel3:
 modifyVolume:
     lfsr    0, 0x300                ; point FSR0 at volume modification table
     movwf   FSR0L, c
-    movff   INDF0, VREFCON2         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
+    movff   INDF0, CCPR1L         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
 
 highIsrDone:
     ; red LED on

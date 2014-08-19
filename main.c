@@ -115,17 +115,19 @@ void main()
     VREFCON2 = 15;
     VREFCON1 = 0b10100000;
 
-    // set up Timer2: period = 125 cycles (12 MHz instruction clock / 125 = 96 kHz); TMR2ON = 1
-    PR2 = 124;
-    T2CON = 0b00000100;
+    CCP1CONbits.CCP1M = 0b1100;
+    CCPR1L = 62;
+    TRISCbits.TRISC2 = 0;
 
-
+    // enable interrupt
     PIR1bits.TMR2IF = 0; // clear Timer2-to-PR2-match interrupt flag
     PIE1bits.TMR2IE = 1; // enable Timer2-to-PR2-match interrupt
-
-    // enable interrupts
     RCONbits.IPEN = 1;    // Enable interrupt priority levels
     INTCONbits.GIE = 1;   // Enable high priority interrupts
+
+    // start Timer2
+    PR2 = 124;          // period = 125 cycles (12 MHz instruction clock / 125 = 96 kHz);
+    T2CON = 0b00000100; // TMR2ON = 1
 
     while (1)
     {  
