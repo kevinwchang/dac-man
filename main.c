@@ -116,7 +116,7 @@ void main()
     VREFCON1 = 0b10100000;
 
     CCP1CONbits.CCP1M = 0b1100;
-    CCPR1L = 62;
+    CCPR1L = 20;
     TRISCbits.TRISC2 = 0;
 
     // enable interrupt
@@ -126,7 +126,7 @@ void main()
     INTCONbits.GIE = 1;   // Enable high priority interrupts
 
     // start Timer2
-    PR2 = 124;          // period = 125 cycles (12 MHz instruction clock / 125 = 96 kHz);
+    PR2 = 41;          // period = 125 cycles (12 MHz instruction clock / 125 = 96 kHz);
     T2CON = 0b00000100; // TMR2ON = 1
 
     while (1)

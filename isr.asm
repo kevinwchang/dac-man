@@ -8,6 +8,7 @@ INDF0 equ 0xFEF ; XC8 forgot this
 
 psect isrVars,class=BANK0,space=1
 
+toggle: ds 1
 acc1: ds 3 // channel 1 20-bit accumulator
 acc2: ds 2 // channel 2 16-bit accumulator
 acc3: ds 2 // channel 3 16-bit accumulator
@@ -28,7 +29,12 @@ highIsr:
     bcf     PIR1, PIR1_TMR2IF_POSN, c
 
     ; select bank 0 (assumption: all variables are in the same bank)
-    movlb   0 ;
+    movlb   0
+
+    decfsz    toggle, f, b
+    bra       highIsrDone
+    movlw   3
+    movwf toggle, b
 
     ; save context
     movff    FSR0H, fsr0h_temp
@@ -101,13 +107,13 @@ modifyVolume:
     movwf   FSR0L, c
     movff   INDF0, CCPR1L         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
 
-highIsrDone:
-    ; red LED on
-    bcf     TRISC, 6, c
-
     ; restore context
     movff   fsr0h_temp, FSR0H
     movff   fsr0l_temp, FSR0L
+
+highIsrDone:
+    ; red LED on
+    bcf     TRISC, 6, c
 
     retfie  f
 
