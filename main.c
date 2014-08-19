@@ -126,7 +126,7 @@ void main()
     INTCONbits.GIE = 1;   // Enable high priority interrupts
 
     // start Timer2
-    PR2 = 41;          // period = 125 cycles (12 MHz instruction clock / 125 = 96 kHz);
+    PR2 = 124;          // period = 125 cycles (12 MHz instruction clock / 125 = 96 kHz);
     T2CON = 0b00000100; // TMR2ON = 1
 
     while (1)

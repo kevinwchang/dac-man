@@ -15,6 +15,9 @@ acc3: ds 2 // channel 3 16-bit accumulator
 chan: ds 1 // current channel being sent to output; increments every iteration (0-indexed: chan == 0 means channel 1)
 fsr0h_temp: ds 1
 fsr0l_temp: ds 1
+out1: ds 1
+out2: ds 1
+out3: ds 1
 
 
 psect isr,class=CODE,abs,ovrld
@@ -30,11 +33,6 @@ highIsr:
 
     ; select bank 0 (assumption: all variables are in the same bank)
     movlb   0
-
-    decfsz    toggle, f, b
-    bra       highIsrDone
-    movlw   3
-    movwf toggle, b
 
     ; save context
     movff    FSR0H, fsr0h_temp
@@ -82,6 +80,9 @@ channel1:
     movwf   FSR0L, c
     swapf   INDF0, w, c                 ; W = waveform_sample << 4                          (assumption: waveform samples are 4 bits)
     iorwf   BANKMASK(_rvol), w, b       ; W = (waveform_sample << 4) | rvol[0]              (assumption: vol is 4 bits)
+    lfsr    0, 0x300                ; point FSR0 at volume modification table
+    movwf   FSR0L, c
+    movff   INDF0, BANKMASK(out1)         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
     bra     modifyVolume
 
 channel2:
@@ -91,6 +92,9 @@ channel2:
     movwf   FSR0L, c
     swapf   INDF0, w, c                 ; W = waveform_sample << 4              (assumption: waveform samples are 4 bits)
     iorwf   BANKMASK(_rvol)+1, w, b     ; W = (waveform_sample << 4) | rvol[1]  (assumption: vol is 4 bits)
+    lfsr    0, 0x300                ; point FSR0 at volume modification table
+    movwf   FSR0L, c
+    movff   INDF0, BANKMASK(out2)         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
     bra     modifyVolume
 
 channel3:
@@ -100,13 +104,17 @@ channel3:
     movwf   FSR0L, c
     swapf   INDF0, w, c                 ; W = waveform_sample << 4              (assumption: waveform samples are 4 bits)
     iorwf   BANKMASK(_rvol)+2, w, b     ; W = (waveform_sample << 4) | rvol[2]  (assumption: vol is 4 bits)
+    lfsr    0, 0x300                ; point FSR0 at volume modification table
+    movwf   FSR0L, c
+    movff   INDF0, BANKMASK(out3)         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
     bra     modifyVolume
 
 modifyVolume:
-    lfsr    0, 0x300                ; point FSR0 at volume modification table
-    movwf   FSR0L, c
-    movff   INDF0, CCPR1L         ; DACR = volume_modified_waveform_sample    (assumption: volume-modified waveform samples are 5 bits)
-
+    movf    BANKMASK(out1), w, b
+    addwf   BANKMASK(out2), w, b
+    addwf   BANKMASK(out3), w, b
+    movwf   CCPR1L, c
+    
     ; restore context
     movff   fsr0h_temp, FSR0H
     movff   fsr0l_temp, FSR0L
